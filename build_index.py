@@ -48,6 +48,32 @@ firebase_script = """
             }
         };
 
+        window.bypassAuth = function() {
+            localStorage.setItem('gemini_local_bypass', 'true');
+            const authModal = document.getElementById('authModal');
+            if (authModal) authModal.classList.add('hidden');
+            if (window.showToast) window.showToast('Mode test local activé !');
+        };
+
+        window.showAuthModal = function() {
+            const authModal = document.getElementById('authModal');
+            if (authModal) authModal.classList.remove('hidden');
+        };
+
+        window.handleUserLogin = function(user) {
+            const profile = {
+                name: user.displayName || user.email.split('@')[0],
+                email: user.email,
+                photoURL: user.photoURL,
+                uid: user.uid
+            };
+            localStorage.setItem('gemini_user_profile', JSON.stringify(profile));
+            if (window.updateUserProfileUI) window.updateUserProfileUI(profile);
+            const authModal = document.getElementById('authModal');
+            if (authModal) authModal.classList.add('hidden');
+            if (window.showToast) window.showToast(`Connecté : ${profile.name}`);
+        };
+
         window.logoutFirebase = async function() {
             try {
                 await signOut(auth);
@@ -257,8 +283,9 @@ js_helpers = """
         };
 """
 
-if 'function loadPersistedState()' in html and 'window.handleUserLogin' not in html:
-    html = html.replace('function loadPersistedState()', js_helpers + '\n        function loadPersistedState()')
+target_lps = 'function loadPersistedState() {'
+if target_lps in html and 'testLocalAiConnection' not in html:
+    html = html.replace(target_lps, js_helpers + '\n        ' + target_lps)
 
 # 8. Update selectModel for qwen-local
 target_select_model = "document.getElementById('check-ultra').classList.toggle('hidden', name !== 'Ultra Advanced');"
