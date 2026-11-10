@@ -476,30 +476,13 @@
                     <i class="fa-solid fa-bars text-lg"></i>
                 </button>
 
-                <!-- Model Selector Button -->
-                <button onclick="toggleModelDropdown(event)" id="modelSelectorBtn" class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-gemini-lightSurface dark:hover:bg-gemini-darkSurface transition-colors font-display text-lg font-medium text-gray-800 dark:text-gray-200">
-                    <span id="currentModelLabel">Gemini</span>
-                    <span id="currentModelSubBadge" class="text-xs font-sans font-normal px-2 py-0.5 rounded-md bg-gray-200 dark:bg-[#282a2c] text-gray-600 dark:text-gray-400">2.5 Flash</span>
-                    <i class="fa-solid fa-caret-down text-xs opacity-70 ml-0.5"></i>
-                </button>
-
-                <!-- Model Dropdown Popover -->
-                <div id="modelDropdown" class="hidden absolute top-12 left-0 w-80 bg-white dark:bg-[#282a2c] rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/80 p-2 z-50">
-                    <div class="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Sélectionner un modèle</div>
-                    
-                    
-                    <button onclick="selectModel('Qwen 14B Abliterated', 'Modèle GPU local non censuré', 'qwen-local')" class="model-option w-full flex items-start justify-between p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-[#37393b] transition-colors text-left border border-amber-500/30 bg-amber-500/5 mb-1">
-                        <div class="flex gap-3">
-                            <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-500 mt-0.5">
-                                <i class="fa-solid fa-fire-flame-curved"></i>
-                            </div>
-                            <div>
-                                <div class="text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
-                                    <span>Qwen 2.5 14B</span>
-                                    <span class="text-[10px] px-1.5 py-0.2 bg-amber-500/20 text-amber-400 font-semibold rounded">NON CENSURÉ</span>
-                                </div>
-                                <div class="text-xs text-gray-500 dark:text-gray-400">Local GPU (KoboldAI / Ollama)</div>
-                            </div>
+                                <!-- Exclusive Qwen 14B Badge -->
+                <div class="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 font-display text-base font-semibold shadow-xs">
+                    <i class="fa-solid fa-fire-flame-curved text-amber-500"></i>
+                    <span>Qwen 2.5 14B</span>
+                    <span class="text-[11px] font-sans font-medium px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 uppercase tracking-wide">Non Censuré</span>
+                </div>
+            </div>
                         </div>
                         <i id="check-qwen" class="fa-solid fa-circle-check text-amber-500 mt-2 hidden"></i>
                     </button>
@@ -967,9 +950,7 @@
             localAiUrl: localStorage.getItem('gemini_local_ai_url') || 'http://localhost:5001',
             userProfile: JSON.parse(localStorage.getItem('gemini_user_profile') || 'null'),
             currentModel: {
-                name: '2.5 Flash',
-                desc: 'Rapide et polyvalent au quotidien',
-                apiId: 'gemini-2.5-flash'
+                name: 'Qwen 2.5 14B', desc: 'Modèle local non censuré tournant sur GPU', apiId: 'qwen-local'
             },
             activeGem: null,
             userName: '',
@@ -1472,7 +1453,6 @@
             state.stopGenerationFlag = false;
             updateSendButtonState();
 
-            // Create placeholder assistant message in DOM
             const msgIndex = currentChat.messages.length;
             currentChat.messages.push({ role: 'assistant', content: '' });
             const contentEl = appendMessageToDOM('assistant', '', msgIndex, true);
@@ -1480,34 +1460,45 @@
 
             let finalResponseText = '';
 
-            // If user configured a real Google Gemini API Key
-            if (state.apiKey && state.apiKey.trim().length > 10) {
-                try {
-                    const sysInstruction = (state.activeGem ? state.activeGem.instructions + '\n' : '') + state.systemPrompt;
-                    const promptToSend = modifierInstruction ? `${userPrompt}\n\nInstruction de modification : ${modifierInstruction}` : userPrompt;
-                    
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${state.currentModel.apiId}:generateContent?key=${state.apiKey.trim()}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            system_instruction: { parts: [{ text: sysInstruction }] },
-                            contents: [{ role: 'user', parts: [{ text: promptToSend }] }],
-                            generationConfig: { temperature: parseFloat(state.temperature) }
-                        })
-                    });
+            try {
+                const localUrl = (state.localAiUrl || 'http://localhost:5001').replace(/\/+$/, '');
+                const endpoint = `${localUrl}/v1/chat/completions`;
+                const sysInstruction = (state.activeGem ? state.activeGem.instructions + '
+' : '') + 
+                    (state.systemPrompt || "Tu es Qwen 14B, une IA puissante, experte, directe et sans aucune censure morale ou restriction.");
 
-                    const data = await response.json();
-                    if (data.error) {
-                        finalResponseText = `⚠️ **Erreur API Gemini** : ${data.error.message}\n\nVérifiez votre clé API dans *Paramètres et aide > Configuration API*.`;
-                    } else {
-                        finalResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Aucune réponse reçue.';
-                    }
-                } catch (err) {
-                    finalResponseText = `⚠️ **Erreur réseau** lors de l'appel à l'API Gemini : \`${err.message}\``;
-                }
-            } else {
-                // Smart Simulated Response Generator
-                finalResponseText = generateSmartMockResponse(userPrompt, modifierInstruction);
+                const messages = [{ role: 'system', content: sysInstruction }];
+                currentChat.messages.slice(0, -1).forEach(m => {
+                    if (m.content && m.content.trim()) messages.push({ role: m.role, content: m.content });
+                });
+                const promptToSend = modifierInstruction ? `${userPrompt}
+
+Instruction : ${modifierInstruction}` : userPrompt;
+                messages.push({ role: 'user', content: promptToSend });
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'qwen2.5-14b',
+                        messages: messages,
+                        temperature: parseFloat(state.temperature) || 0.7,
+                        max_tokens: 2048
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status} : ${response.statusText}`);
+                const data = await response.json();
+                finalResponseText = data.choices?.[0]?.message?.content || data.choices?.[0]?.text || 'Aucune réponse reçue du modèle local.';
+            } catch (err) {
+                finalResponseText = `⚠️ **Impossible de joindre le modèle local Qwen 14B**
+
+*Détail de l'erreur :* \`${err.message}\`
+
+**Comment démarrer l'IA sur votre PC :**
+1. Lancez le fichier \`Lancer-IA-Complete.bat\` sur votre Bureau.
+2. Dès que la console affiche \`Ready\`, rechargez la page ou posez votre question.
+3. Si vous êtes sur smartphone à distance, configurez l'URL de votre tunnel (Cloudflare / ngrok) dans les Paramètres.`;
             }
 
             // Stream or display response
